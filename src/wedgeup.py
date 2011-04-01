@@ -111,7 +111,14 @@ except:
 # Open the files database.
 try:
     filesdb = pickledb.PickleDatabase(dbloc,True,True)
-    filesdb = filesdb.open()
+    try:
+        filesdb.open()
+    except:
+        filesdb.create(dbloc)
+        filesdb.open(dbloc)
+        filesdb['disks']={}
+        filesdb['files']={}
+        filesdb.commit()
 except:
     raise DatabaseError("Error opening the Database.")
 
@@ -131,11 +138,36 @@ for root, dirs, files in os.walk(root_dir):
                              ,'crc32': crc(namepath) \
                              ,'size': os.stat(namepath).st_size }
 
+print(disks)
+filesdb['disks']={}
+filesdb.commit()
+# If the disks aren't listed, list them, and set their currently used space to 0
+for disk in disks:
+    if disk not in filesdb['disks']:
+        filesdb['disks'][disk]={'mountpoint': disks[disk]['mountpoint']\
+                               ,'max_size':disks[disk]['size']\
+                               ,'current':0\
+                                }
 
-print(filelist)
+filesdb.commit()
+print(filesdb['disks'])
+
 
 # First, order the files by size, largest to smallest. Then the order
 # disks -- least space remaining to greatest.
 # Put the files which need to be put on the disks on the disks in the first that
 # they fit in, if they need to be transfered (i.e. if they've changed or they're
 # not listed.
+
+# Ordered files...
+all_files = []
+for key in filelist:
+    all_files.append(key)
+file_sorted=sorted(all_files,key=(lambda x : filelist[x]['size']), reverse=True)
+
+# Ordered disks
+all_disks = []
+for disk in filesdb['disks']:
+    all_disks.append(disk)
+disks_sorted=sorted(all_disks,key=(lambda x: filesdb['disks'][x]['current']))
+

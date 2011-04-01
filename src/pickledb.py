@@ -174,6 +174,16 @@ class PickleDatabase():
         
         hhandle = open(filename,'wb')
         pickle.dump(header,hhandle)
+
+    def __contains__(self,key):
+        """
+            Return True if a key is in the database, False if it is not and
+            raise an exception if the database is not open.
+        """
+        if not self.opened:
+            raise PDatabaseNotOpen()
+        else:
+            return (key in self.data)
         hhandle.close()
 
     def __iter__(self):
@@ -185,13 +195,4 @@ class PickleDatabase():
         for key in self.data:
             yield key
 
-    def __contains__(self,key):
-        """
-            Return True if a key is in the database, False if it is not and
-            raise an exception if the database is not open.
-        """
-        if not self.opened:
-            raise PDatabaseNotOpen()
-        else:
-            return (key in self.data)
-        """
+        
