@@ -183,4 +183,15 @@ class PickleDatabase():
         if not self.opened:
             raise PDatabaseNotOpen()
         for key in self.data:
-            yield key 
+            yield key
+
+    def __contains__(self,key):
+        """
+            Return True if a key is in the database, False if it is not and
+            raise an exception if the database is not open.
+        """
+        if not self.opened:
+            raise PDatabaseNotOpen()
+        else:
+            return (key in self.data)
+        """

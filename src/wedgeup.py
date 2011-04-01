@@ -20,14 +20,37 @@ import optparse
 import configparser
 import json
 import pickledb
+import os
+import zlib
 
-class ConfigError():
+class ConfigError(BaseException):
     pass
 
-def decode_json(configparse, name):
-    temp = config.get('DEFAULTS',name)
-    temp = json.loads(temp)
+class DatabaseError(BaseException):
+    pass
+
+def crc(filename):
+    """
+        Get the CRC value of the file given.
+    """
+    buff = bytearray()
+    for line in open(filename,'rb'):
+        for char in line:
+            buff.append(char)
+    return zlib.crc32(buff)
+
+def decode_json(configp, name):
+    """
+        Decodes JSON objects out of a given config file.
+    """
+    try:
+        temp = configp.get('DEFAULTS',name)
+        temp = json.loads(temp)
+    except:
+        raise ConfigError("Could not decode "+name)
     return temp
+
+# Read the command line args and the configuration file.
 
 # The default configuration file.
 default_config = '/etc/wedgeup.conf'
@@ -52,8 +75,11 @@ argparser.add_option("--database","-d",type="string", \
 
 
 # Read the config file as specified either at the cmd line or by default.
-config = configparser.ConfigParser()
-config.read(options.config)
+try:
+    config = configparser.ConfigParser()
+    config.read(options.config)
+except:
+    raise ConfigError("Could not read the config file")
 
 # If the database was not specified, use the one from the command line.
 if options.database is None:
@@ -61,17 +87,55 @@ if options.database is None:
 else:
     raise ConfigError("No database specified")
 
-
-
 # Pull out various useful bits of info from the command line.
-disks = decode_json(config,'disks')
-blacklist = decode_json(config,'blacklist')
-root_dir = config.get('DEFAULTS','rootdir')
-dbloc = config.get('DEFAULTS','dblocation')
+try:
+    disks = decode_json(config,'disks')
+except:
+    raise ConfigError("Could not read the disks list")
+
+try:
+    blacklist = decode_json(config,'blacklist')
+except:
+    raise ConfigError("Could not read the blacklist")
+
+try:
+    root_dir = config.get('DEFAULTS','rootdir')
+except:
+    raise ConfigError("Could not get the root directory")
+
+try:
+    dbloc = config.get('DEFAULTS','dblocation')
+except:
+    raise ConfigError("Could not get the database location")
 
 # Open the files database.
-filesdb = pickledb.PickleDatabase(dbloc,True,True)
-filesdb = filesdb.open()
+try:
+    filesdb = pickledb.PickleDatabase(dbloc,True,True)
+    filesdb = filesdb.open()
+except:
+    raise DatabaseError("Error opening the Database.")
 
 # All of the requisite setup is now done. We can move onto walking the fs and
 # seeing if anything needs to be copied onto any of the disks.
+filelist = {}
+os.chdir('/')
+print(root_dir)
+print("Building File List")
+for root, dirs, files in os.walk(root_dir):
+    for file in blacklist:
+        if file in dirs:
+            dirs.remove(file)
+    for name in files:
+        namepath = os.path.join(root,name)
+        filelist[namepath] = {'timestamp': os.stat(namepath).st_mtime\
+                             ,'crc32': crc(namepath) \
+                             ,'size': os.stat(namepath).st_size }
+
+
+print(filelist)
+
+# First, order the files by size, largest to smallest. Then the order
+# disks -- least space remaining to greatest.
+# Put the files which need to be put on the disks on the disks in the first that
+# they fit in, if they need to be transfered (i.e. if they've changed or they're
+# not listed.
