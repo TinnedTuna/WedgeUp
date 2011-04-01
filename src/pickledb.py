@@ -34,7 +34,7 @@ class PDatabaseAlreadyOpen(BaseException):
 class PDatabaseNotOpen(BaseException):
     pass
 
-class PickleDatabase(BaseException):
+class PickleDatabase():
     """
         The database class, this handles everything.
     """
