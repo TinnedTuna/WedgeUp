@@ -139,8 +139,7 @@ for root, dirs, files in os.walk(root_dir):
                              ,'size': os.stat(namepath).st_size }
 
 print(disks)
-filesdb['disks']={}
-filesdb.commit()
+
 # If the disks aren't listed, list them, and set their currently used space to 0
 for disk in disks:
     if disk not in filesdb['disks']:
@@ -159,15 +158,26 @@ print(filesdb['disks'])
 # they fit in, if they need to be transfered (i.e. if they've changed or they're
 # not listed.
 
-# Ordered files...
-all_files = []
-for key in filelist:
-    all_files.append(key)
-file_sorted=sorted(all_files,key=(lambda x : filelist[x]['size']), reverse=True)
+# Find which files need copying
+files_to_copy = []
+for file in filelist:
+    if file not in filesdb:
+        files_to_copy.append(file)
+    else:
+        if (filesdb['files'][file]['crc32'] != filelist[file]['crc32']) or \
+           (filesdb['files'][file]['date'] != filelist[file]['date']):
+             files_to_copy.append(file)
+        else:
+            pass
+
 
 # Ordered disks
 all_disks = []
 for disk in filesdb['disks']:
     all_disks.append(disk)
 disks_sorted=sorted(all_disks,key=(lambda x: filesdb['disks'][x]['current']))
+
+# Sort the files smallest to largest.
+files_sorted = sorted(files_to_copy,key=lambda x : filelist[x]['size'])
+print(files_sorted)
 
