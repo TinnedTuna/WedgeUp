@@ -21,7 +21,7 @@ import configparser
 import json
 import pickledb
 import os
-import zlib
+import hashlib
 
 class ConfigError(BaseException):
     pass
@@ -29,15 +29,20 @@ class ConfigError(BaseException):
 class DatabaseError(BaseException):
     pass
 
-def csum(filename):
+def csum(filename, bs=2**20):
     """
-        Get the CRC value of the file given.
+        Get the MD5 sum of the given filename.
     """
-    buff = bytearray()
-    for line in open(filename,'rb'):
-        for char in line:
-            buff.append(char)
-    return zlib.crc32(buff)
+    md5 = hashlib.md5()
+    f = open(filename,'rb')
+    while True:
+        dat = f.read(bs)
+        if not dat:
+            break;
+        else:
+            md5.update(dat)
+    return md5.digest()
+    f.close()
 
 def decode_json(configp, name):
     """
@@ -138,7 +143,6 @@ for root, dirs, files in os.walk(root_dir):
                              ,'csum': csum(namepath) \
                              ,'size': os.stat(namepath).st_size }
 
-print(disks)
 
 # If the disks aren't listed, list them, and set their currently used space to 0
 for disk in disks:
@@ -149,7 +153,7 @@ for disk in disks:
                                 }
 
 filesdb.commit()
-print(filesdb['disks'])
+
 
 
 # First, order the files by size, largest to smallest. Then the order
@@ -231,5 +235,6 @@ for file in files_sorted:
 print(drives_q)
 print(filesdb['disks'])
 
-print("Warning! The following files will NOT be backed up due to lack of space: ")
-print(str(non_fitting))
+if len(non_fitting) != 0:
+    print("Warning! The following files will NOT be backed up due to lack of space: ")
+    print(str(non_fitting))
