@@ -5,7 +5,7 @@ This is a backup script, WedgeUp.
 
 It is designed to backup systems to a series of drives, also known as 'wedges'.
 WedgeUp will only moves files it believes to have been changed. That is, if
-their CRC32 has changed, or their timestamp has been updated.
+their checksum (current, the CRC32) has changed, or their timestamp has been updated.
 
 This is kept across runs of each file.
 
@@ -29,7 +29,7 @@ class ConfigError(BaseException):
 class DatabaseError(BaseException):
     pass
 
-def crc(filename):
+def csum(filename):
     """
         Get the CRC value of the file given.
     """
@@ -110,7 +110,7 @@ except:
 
 # Open the files database.
 try:
-    filesdb = pickledb.PickleDatabase(dbloc,True,True)
+    filesdb = pickledb.PickleDatabase(dbloc,False,True)
     try:
         filesdb.open()
     except:
@@ -127,7 +127,7 @@ except:
 filelist = {}
 os.chdir('/')
 print(root_dir)
-print("Building File List")
+print("Building File List...")
 for root, dirs, files in os.walk(root_dir):
     for file in blacklist:
         if file in dirs:
@@ -135,7 +135,7 @@ for root, dirs, files in os.walk(root_dir):
     for name in files:
         namepath = os.path.join(root,name)
         filelist[namepath] = {'timestamp': os.stat(namepath).st_mtime\
-                             ,'crc32': crc(namepath) \
+                             ,'csum': csum(namepath) \
                              ,'size': os.stat(namepath).st_size }
 
 print(disks)
@@ -164,20 +164,72 @@ for file in filelist:
     if file not in filesdb:
         files_to_copy.append(file)
     else:
-        if (filesdb['files'][file]['crc32'] != filelist[file]['crc32']) or \
+        if (filesdb['files'][file]['csum'] != filelist[file]['csum']) or \
            (filesdb['files'][file]['date'] != filelist[file]['date']):
              files_to_copy.append(file)
         else:
             pass
 
 
-# Ordered disks
+# Ordered disks, no real reason really...
 all_disks = []
 for disk in filesdb['disks']:
     all_disks.append(disk)
 disks_sorted=sorted(all_disks,key=(lambda x: filesdb['disks'][x]['current']))
 
 # Sort the files smallest to largest.
-files_sorted = sorted(files_to_copy,key=lambda x : filelist[x]['size'])
-print(files_sorted)
+files_sorted = sorted( files_to_copy \
+                     , key = (lambda x : filelist[x]['size']) \
+                     , reverse = True )
 
+#
+# Bin packing algorithm, simple first-fit algo.
+#
+
+
+def remaining_space(disk):
+    """
+         Calculate the remaining space on a given disk.
+    """
+    max_size = int(filesdb['disks'][disk]['max_size'])
+    current = int (filesdb['disks'][disk]['current'] )
+    return max_size - current
+
+
+def update_working_space(disk,file):
+    """
+        Update the space on the in-memory database of the disks:
+    """
+    filesdb['disks'][disk]['current']+=filelist[file]['size']
+
+drives_q = {} # A queue for each disk. Files are queued for each drive.
+for disk in disks_sorted:
+    drives_q[disk]=[] # Create an empty queue.
+
+non_fitting = [] # The files that cannot be fit onto ANY drives.
+# This is where the files are queued.
+for file in files_sorted:
+    queued = False
+    for disk in disks_sorted:
+        if filelist[file]['size']<remaining_space(disk):
+            # We've found space for the file, queue it.
+            drives_q[disk].append(file)
+            queued = True
+            # Update the used space on the disk
+            update_working_space(disk,file)
+            # No need to search the other drives, so break out of one loop
+            # (the disk-searching loop)
+            break
+        else:
+            # Skip this drive
+            pass
+    if not queued:
+        # We could not fit it on ANY drive, point this out.
+         non_fitting.append(file)
+
+
+print(drives_q)
+print(filesdb['disks'])
+
+print("Warning! The following files will NOT be backed up due to lack of space: ")
+print(str(non_fitting))
