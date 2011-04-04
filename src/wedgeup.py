@@ -14,6 +14,7 @@ WedgeUp also supports blacklisting of various directories (and all
 subdirectories of that directory). For example, /proc should probably not be
 backed up, but /home and /var should be.
 """
+
 __author__="Tinned_Tuna"
 __date__ ="$01-Apr-2011 15:07:20$"
 
@@ -25,6 +26,7 @@ import os
 import hashlib
 import shutil
 import time
+
 class ConfigError(BaseException):
     pass
 
@@ -148,7 +150,7 @@ except:
 # All of the requisite setup is now done. We can move onto walking the fs and
 # seeing if anything needs to be copied onto any of the disks.
 filelist = {}
-os.chdir('/')
+
 print("Building File List...")
 for root, dirs, files in os.walk(root_dir):
     for file in blacklist:
@@ -247,7 +249,6 @@ for disk in drives_q:
     print("Please mount "+disk+" at mountpoint " \
          + mpoint +" and hit any key to continue.")
     input()
-    print(disk)
     for file in drives_q[disk]:
         # Copy the file onto the drive with a nice new name.
         try:
@@ -265,4 +266,9 @@ for disk in drives_q:
             print("Could not copy file: "+file)
 
     # Save the database to the drive!
-    filesdb.commit(mpoint+"/"+"wedgedb-"+str(time.ctime()))
+    curr_time = str(time.time())
+    filesdb.commit(mpoint+"/"+"wedgedb-"+curr_time)
+    # Save a copy of the config file used
+    shutil.copy2(options.config \
+                , mpoint+'/'+'wedgecfg' \
+                + os.path.basename(options.config)+curr_time)
