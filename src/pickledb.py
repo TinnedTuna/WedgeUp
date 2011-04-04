@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 import pickle
-import subprocess
 import random
+import hashlib
 
 """
 An on-disk database hacked together using the Pickle module.
@@ -86,14 +86,21 @@ class PickleDatabase():
             else:
                 raise PVerficationFalse()
 
-    def __md5(self, filename):
+    def __md5(self, filename, bs=2*20):
         """
-            Get the md5sum for a given filename
+            Get the MD5 sum of the given filename.
         """
-        res = subprocess.getoutput("md5sum "+filename) 
-                                                    # Only has one line output
-        retval = res.split(' ')[0]
-        return retval # The md5sum is here!
+        md5 = hashlib.md5()
+        f = open(filename,'rb')
+        while True:
+            dat = f.read(bs)
+            if not dat:
+                break;
+            else:
+                md5.update(dat)
+        f.close()
+        return md5.digest()
+        
         
     def __verify(self, header=None):
         """
@@ -138,10 +145,40 @@ class PickleDatabase():
         if self.autocommit:
             self.commit()
 
-    def commit(self):
+    def __commit_loc(self,loc):
+        """
+            Commit changes to the database to a given location, loc.
+        """
+        local_data=loc+str(random.randint(0,100000000000))+'.pdata'
+
+        # Write the datachunk then update the header.
+        datahandle = open(local_data,'wb')
+        pickle.dump(self.data, datahandle)
+        datahandle.close()
+
+
+        # Get the new md5sum
+        newmd5 = self.__md5(local_data)
+        # Create & update the local header file.
+        local_header = self.header
+        local_header['md5sum'] = newmd5
+
+        # Write it out.
+        headerhandle = open(loc, 'wb')
+        pickle.dump(local_header, headerhandle)
+        headerhandle.close()
+
+    def commit(self,loc=None):
         """
             Commit all the changes to the database.
+
+            The optional loc parameter allows the user to save this database
+            to a different location.
         """
+        if loc is not None:
+            self.__commit_loc(loc)
+            return
+
         # Write the datachunk then update the header.
         datahandle = open(self.header['data'],'wb')
         pickle.dump(self.data, datahandle)

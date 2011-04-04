@@ -23,7 +23,8 @@ import json
 import pickledb
 import os
 import hashlib
-
+import shutil
+import time
 class ConfigError(BaseException):
     pass
 
@@ -42,8 +43,9 @@ def csum(filename, bs=2**20):
             break;
         else:
             md5.update(dat)
-    return md5.digest()
     f.close()
+    return md5.hexdigest()
+    
 
 def decode_json(configp, name):
     """
@@ -55,6 +57,21 @@ def decode_json(configp, name):
     except:
         raise ConfigError("Could not decode "+name)
     return temp
+
+def remaining_space(disk):
+    """
+         Calculate the remaining space on a given disk.
+    """
+    max_size = int(filesdb['disks'][disk]['max_size'])
+    current = int (filesdb['disks'][disk]['current'] )
+    return max_size - current
+
+
+def update_working_space(disk,file):
+    """
+        Update the space on the in-memory database of the disks:
+    """
+    filesdb['disks'][disk]['current']+=filelist[file]['size']
 
 # Read the command line args and the configuration file.
 
@@ -192,20 +209,7 @@ files_sorted = sorted( files_to_copy \
 #
 
 
-def remaining_space(disk):
-    """
-         Calculate the remaining space on a given disk.
-    """
-    max_size = int(filesdb['disks'][disk]['max_size'])
-    current = int (filesdb['disks'][disk]['current'] )
-    return max_size - current
 
-
-def update_working_space(disk,file):
-    """
-        Update the space on the in-memory database of the disks:
-    """
-    filesdb['disks'][disk]['current']+=filelist[file]['size']
 
 drives_q = {} # A queue for each disk. Files are queued for each drive.
 for disk in disks_sorted:
@@ -244,12 +248,22 @@ if len(non_fitting) != 0:
 # the database on the disk.
 for disk in drives_q:
     # Request the drive:
+    mpoint = filesdb['disks'][disk]['mountpoint']
     print("Please mount "+disk+" at mountpoint " \
-         + filesdb['disks'][disk]['mountpoint']+" and hit any key to continue.")
-    raw_input()
-    for file in disk:
+         + mpoint +" and hit any key to continue.")
+    input()
+    print(disk)
+    for file in drives_q[disk]:
         # Copy the file onto the drive with a nice new name.
         shutil.copy2(file \
-                    , (filesdb['disk'][disk]['mountpoint'])+'/'+file \
-                    + filelist[file]['csum']
-                     )
+                    , mpoint + '/' + os.path.basename(file) \
+                    + str(filelist[file]['csum']))
+        filesdb['files'][file]={ 'disk':disk \
+                               , 'size':filelist[file]['size'] \
+                               , 'csum':filelist[file]['csum'] \
+                               , 'modified_time':filelist[file]['timestamp'] \
+                               , 'backup_time' : time.localtime() \
+                               }
+
+    # Save the database to the drive!
+    filesdb.commit(mpoint+"/"+"wedgedb-"+str(time.ctime()))
