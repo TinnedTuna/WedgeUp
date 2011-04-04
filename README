@@ -1,0 +1,71 @@
+WedgeUp 0.1 by Daniel Turner <dsturner@dannyturner.net>
+
+This is a backup script, WedgeUp.
+
+It is designed to backup systems to a series of drives, also known as 'wedges'.
+WedgeUp will only moves files it believes to have been changed. That is, if
+their checksum (currently, the MD5) has changed, or their timestamp has been
+updated.
+
+This is kept across runs of each file.
+
+WedgeUp also supports blacklisting of various directories (and all
+subdirectories of that directory). For example, /proc should probably not be
+backed up, but /home and /var should be.
+
+WedgeUp stores a copy of it's config file and the file lists (wedgedb) along
+with the backups to facilitate recovery.
+
+CONFIGURATION
+
+Sample Config file:
+
+[DEFAULTS]
+# Hashes are comments.
+
+# This line tells WedgeUp what disks are available. It tells them a unique name,
+# their mount point and their maximum size in bytes. It is a chunk of JSON
+disks = {"disk1" : {
+              "mountpoint" : "/home/tuna/testdir",
+              "size" : "60000" },
+         "disk2" : {
+              "mountpoint" : "/home/tuna/testdir2",
+              "size" : "40000000"}
+        }
+
+# This tells WedgeUp to find the master copy of the files list.
+dblocation = /home/tuna/NetBeansProjects/WedgeUp/wedgedb
+
+# This is where WedgeUp will start backing up from.
+rootdir = /home/tuna/Python
+
+# Stuff you don't want backed up.
+blacklist = ["proc","PEN"]
+
+COMMAND LINE ARGUMNENTS
+
+Options:
+  -h, --help            show this help message and exit
+  -c CONFIG, --config=CONFIG
+                        Location of the configuration file, defaults to
+                        /etc/wedgeup.conf
+  -d DATABASE, --database=DATABASE
+                        The location of the database of backed up files.
+                        The default is listed in the config file.
+
+BUGS AND OTHER STUFF
+
+Once a drive has been added to the system, not supplying it during a backup
+may cause odd behaviour.
+
+All backups are stored to the root of the drive, unless you set the mount point
+slightly differently, assuming the drive is mounted at /media/diskmnt:
+
+mountpoint : '/media/diskmnt/path/to/backups'
+
+Do not give any two disks the same name in the disks list. This will cause
+bad things to happen. Try to make them memorable to yourself so that you can
+find the disks when you want them, or at least use a disk serial number that's
+going to be unique and that you can find just by looking at the disk.
+
+

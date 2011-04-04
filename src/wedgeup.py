@@ -238,7 +238,8 @@ for file in files_sorted:
          non_fitting.append(file)
 
 if len(non_fitting) != 0:
-    print("Warning! The following files will NOT be backed up due to lack of space: ")
+    print(\
+    "Warning! The following files will NOT be backed up due to lack of space: ")
     print(str(non_fitting))
 
 # Iterate over the disks, putting the queue onto them, and saving a copy of
