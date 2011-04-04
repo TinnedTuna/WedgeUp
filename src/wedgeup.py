@@ -5,7 +5,8 @@ This is a backup script, WedgeUp.
 
 It is designed to backup systems to a series of drives, also known as 'wedges'.
 WedgeUp will only moves files it believes to have been changed. That is, if
-their checksum (current, the CRC32) has changed, or their timestamp has been updated.
+their checksum (currently, the MD5) has changed, or their timestamp has been
+updated.
 
 This is kept across runs of each file.
 
@@ -238,3 +239,17 @@ print(filesdb['disks'])
 if len(non_fitting) != 0:
     print("Warning! The following files will NOT be backed up due to lack of space: ")
     print(str(non_fitting))
+
+# Iterate over the disks, putting the queue onto them, and saving a copy of
+# the database on the disk.
+for disk in drives_q:
+    # Request the drive:
+    print("Please mount "+disk+" at mountpoint " \
+         + filesdb['disks'][disk]['mountpoint']+" and hit any key to continue.")
+    raw_input()
+    for file in disk:
+        # Copy the file onto the drive with a nice new name.
+        shutil.copy2(file \
+                    , (filesdb['disk'][disk]['mountpoint'])+'/'+file \
+                    + filelist[file]['csum']
+                     )
