@@ -149,7 +149,6 @@ except:
 # seeing if anything needs to be copied onto any of the disks.
 filelist = {}
 os.chdir('/')
-print(root_dir)
 print("Building File List...")
 for root, dirs, files in os.walk(root_dir):
     for file in blacklist:
@@ -236,10 +235,6 @@ for file in files_sorted:
         # We could not fit it on ANY drive, point this out.
          non_fitting.append(file)
 
-
-print(drives_q)
-print(filesdb['disks'])
-
 if len(non_fitting) != 0:
     print("Warning! The following files will NOT be backed up due to lack of space: ")
     print(str(non_fitting))
@@ -255,15 +250,19 @@ for disk in drives_q:
     print(disk)
     for file in drives_q[disk]:
         # Copy the file onto the drive with a nice new name.
-        shutil.copy2(file \
-                    , mpoint + '/' + os.path.basename(file) \
-                    + str(filelist[file]['csum']))
-        filesdb['files'][file]={ 'disk':disk \
+        try:
+            shutil.copy2(file \
+                         , mpoint + '/' + os.path.basename(file) \
+                         + str(filelist[file]['csum']))
+
+            filesdb['files'][file]={ 'disk':disk \
                                , 'size':filelist[file]['size'] \
                                , 'csum':filelist[file]['csum'] \
                                , 'modified_time':filelist[file]['timestamp'] \
                                , 'backup_time' : time.localtime() \
                                }
+        except:
+            print("Could not copy file: "+file)
 
     # Save the database to the drive!
     filesdb.commit(mpoint+"/"+"wedgedb-"+str(time.ctime()))
