@@ -153,9 +153,10 @@ filelist = {}
 
 print("Building File List...")
 for root, dirs, files in os.walk(root_dir):
-    for file in blacklist:
-        if file in dirs:
-            dirs.remove(file)
+    for directory in blacklist:
+
+        if os.path.join(root,directory) in dirs:
+            dirs.remove(directory)
     for name in files:
         namepath = os.path.join(root,name)
         filelist[namepath] = {'timestamp': os.stat(namepath).st_mtime\
@@ -209,9 +210,6 @@ files_sorted = sorted( files_to_copy \
 # Bin packing algorithm, simple first-fit algo.
 #
 
-
-
-
 drives_q = {} # A queue for each disk. Files are queued for each drive.
 for disk in disks_sorted:
     drives_q[disk]=[] # Create an empty queue.
@@ -237,6 +235,7 @@ for file in files_sorted:
         # We could not fit it on ANY drive, point this out.
          non_fitting.append(file)
 
+# Warn the user if some files would not fit anywhere!
 if len(non_fitting) != 0:
     print(\
     "Warning! The following files will NOT be backed up due to lack of space: ")
