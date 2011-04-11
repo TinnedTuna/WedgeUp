@@ -153,10 +153,10 @@ filelist = {}
 
 print("Building File List...")
 for root, dirs, files in os.walk(root_dir):
-    for directory in blacklist:
-
-        if os.path.join(root,directory) in dirs:
-            dirs.remove(directory)
+    print (root,dirs,files)
+    for dir in dirs:
+        if os.path.join(root,dir) in blacklist:
+            dirs.remove(dir)
     for name in files:
         namepath = os.path.join(root,name)
         filelist[namepath] = {'timestamp': os.stat(namepath).st_mtime\
