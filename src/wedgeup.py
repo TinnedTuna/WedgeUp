@@ -153,15 +153,18 @@ filelist = {}
 
 print("Building File List...")
 for root, dirs, files in os.walk(root_dir):
-    print (root,dirs,files)
     for dir in dirs:
         if os.path.join(root,dir) in blacklist:
             dirs.remove(dir)
     for name in files:
         namepath = os.path.join(root,name)
-        filelist[namepath] = {'timestamp': os.stat(namepath).st_mtime\
-                             ,'csum': csum(namepath) \
-                             ,'size': os.stat(namepath).st_size }
+        try:
+            cs = csum(namepath)
+            filelist[namepath] = {'timestamp': os.stat(namepath).st_mtime\
+                                 ,'csum': csum(namepath) \
+                                 ,'size': os.stat(namepath).st_size }
+        except IOError:
+            print("Warning: Could not backup "+namepath+", continuing.")
 
 
 # If the disks aren't listed, list them, and set their currently used space to 0
