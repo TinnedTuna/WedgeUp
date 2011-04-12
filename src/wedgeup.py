@@ -20,45 +20,13 @@ __date__ ="$01-Apr-2011 15:07:20$"
 
 import optparse
 import configparser
-import json
 import pickledb
 import os
-import hashlib
 import shutil
 import time
 
-class ConfigError(BaseException):
-    pass
+import wedges
 
-class DatabaseError(BaseException):
-    pass
-
-def csum(filename, bs=2**20):
-    """
-        Get the MD5 sum of the given filename.
-    """
-    md5 = hashlib.md5()
-    f = open(filename,'rb')
-    while True:
-        dat = f.read(bs)
-        if not dat:
-            break;
-        else:
-            md5.update(dat)
-    f.close()
-    return md5.hexdigest()
-    
-
-def decode_json(configp, name):
-    """
-        Decodes JSON objects out of a given config file.
-    """
-    try:
-        temp = configp.get('DEFAULTS',name)
-        temp = json.loads(temp)
-    except:
-        raise ConfigError("Could not decode "+name)
-    return temp
 
 def remaining_space(disk):
     """
@@ -75,16 +43,55 @@ def update_working_space(disk,file):
     """
     filesdb['disks'][disk]['current']+=filelist[file]['size']
 
-# Read the command line args and the configuration file.
+def open_filesdb(dbloc):
+    """
+        Open the files database. On failure, attempt to create a new, fresh one
+        at dbloc.
+    """
+    try:
+        filesdb = pickledb.PickleDatabase(dbloc,False,True)
+        try:
+            filesdb.open()
+        except:
+            filesdb.create(dbloc)
+            filesdb.open(dbloc)
+            filesdb['disks']={}
+            filesdb['files']={}
+            filesdb.commit()
+        return filesdb;
+    except:
+        raise DatabaseError("Error opening the Database.")
 
-# The default configuration file.
-default_config = '/etc/wedgeup.conf'
+def build_file_list(root_dir,blacklist):
+    """
+        Walk the filesystem from the root directory, root_dir, disregarding any
+        directories whos absolute path is found in blacklist.
+    """
+    filelist = {}
+    print("Building File List...")
+    for root, dirs, files in os.walk(root_dir):
+        for dir in dirs:
+            if os.path.join(root,dir) in blacklist:
+                dirs.remove(dir)
+        for name in files:
+            namepath = os.path.join(root,name)
+            try:
+                cs = wedges.csum(namepath)
+                filelist[namepath] = {'timestamp': os.stat(namepath).st_mtime\
+                                     ,'csum': cs \
+                                     ,'size': os.stat(namepath).st_size }
+            except IOError:
+                print("Warning: Could not backup "+namepath+", continuing.")
+        return filelist;
+
+
+# Read the command line args and the configuration file.
 
 # The methods to parse the command line options.
 argparser = optparse.OptionParser(description="A backup tool.", prog="WedgeUp")
 
 # An option to modify which configuration file is used.
-argparser.add_option("--config","-c", default=default_config, type="string", \
+argparser.add_option("--config","-c", default=wedges.default_config, type="string", \
                       help="""Location of the configuration file, defaults to
                               """+default_config \
                     )
@@ -114,12 +121,12 @@ else:
 
 # Pull out various useful bits of info from the command line.
 try:
-    disks = decode_json(config,'disks')
+    disks = wedges.decode_json(config,'disks')
 except:
     raise ConfigError("Could not read the disks list")
 
 try:
-    blacklist = decode_json(config,'blacklist')
+    blacklist = wedges.decode_json(config,'blacklist')
 except:
     raise ConfigError("Could not read the blacklist")
 
@@ -134,38 +141,11 @@ except:
     raise ConfigError("Could not get the database location")
 
 # Open the files database.
-try:
-    filesdb = pickledb.PickleDatabase(dbloc,False,True)
-    try:
-        filesdb.open()
-    except:
-        filesdb.create(dbloc)
-        filesdb.open(dbloc)
-        filesdb['disks']={}
-        filesdb['files']={}
-        filesdb.commit()
-except:
-    raise DatabaseError("Error opening the Database.")
+filesdb = open_filesdb(dbloc)
 
 # All of the requisite setup is now done. We can move onto walking the fs and
 # seeing if anything needs to be copied onto any of the disks.
-filelist = {}
-
-print("Building File List...")
-for root, dirs, files in os.walk(root_dir):
-    for dir in dirs:
-        if os.path.join(root,dir) in blacklist:
-            dirs.remove(dir)
-    for name in files:
-        namepath = os.path.join(root,name)
-        try:
-            cs = csum(namepath)
-            filelist[namepath] = {'timestamp': os.stat(namepath).st_mtime\
-                                 ,'csum': csum(namepath) \
-                                 ,'size': os.stat(namepath).st_size }
-        except IOError:
-            print("Warning: Could not backup "+namepath+", continuing.")
-
+filelist = build_file_list(root_dir,blacklist)
 
 # If the disks aren't listed, list them, and set their currently used space to 0
 for disk in disks:
@@ -176,8 +156,6 @@ for disk in disks:
                                 }
 
 filesdb.commit()
-
-
 
 # First, order the files by size, largest to smallest. Then the order
 # disks -- least space remaining to greatest.
